@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SQL-Dex</title>
+  <link rel="stylesheet" href="/vendor/codemirror.css">
+  <link rel="stylesheet" href="/vendor/material-darker.css">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">▚</span>
+      <div>
+        <h1>SQL-Dex</h1>
+        <p class="tagline">Learn SQL by exploring the Pokémon world</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="examplesBtn" class="btn">📖 Examples</button>
+      <button id="runBtn" class="btn btn-primary">▶ Run <span class="kbd">Ctrl↵</span></button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="editors">
+      <div class="pane">
+        <div class="pane-head">
+          <span class="pane-title">Your query</span>
+          <span class="pane-hint">write &amp; run your SQL here</span>
+        </div>
+        <textarea id="userEditor"></textarea>
+      </div>
+      <div class="pane">
+        <div class="pane-head">
+          <span class="pane-title">Tutor</span>
+          <span class="pane-hint">examples &amp; hints appear here — retype them to learn</span>
+          <button id="copyToUser" class="mini-btn" title="Copy tutor query into your editor">↤ use this</button>
+        </div>
+        <textarea id="tutorEditor"></textarea>
+      </div>
+    </section>
+
+    <section class="results">
+      <div id="spriteStrip" class="sprite-strip" hidden></div>
+      <div id="resultMeta" class="result-meta"></div>
+      <div id="resultArea" class="result-area">
+        <p class="placeholder">Run a query to see results. Try the Examples for ideas.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Examples modal -->
+  <div id="examplesModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h2 id="modalTitle">Example queries</h2>
+        <button class="icon-btn" data-close aria-label="Close">✕</button>
+      </div>
+      <p class="modal-sub">Load one into the <strong>Tutor</strong> pane, read it, then retype it yourself.</p>
+      <ul id="examplesList" class="examples-list"></ul>
+    </div>
+  </div>
+
+  <script src="/vendor/codemirror.js"></script>
+  <script src="/vendor/sql.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

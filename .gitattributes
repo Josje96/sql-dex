@@ -1,0 +1,10 @@
+# Normalize line endings so gofmt stays happy across platforms.
+*.go   text eol=lf
+*.mod  text eol=lf
+*.sum  text eol=lf
+*.js   text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+
+# The pokédex database is binary; never touch its bytes.
+*.sqlite binary

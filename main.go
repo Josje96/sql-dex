@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/Josje96/sql-dex/internal/cli"
+	"github.com/Josje96/sql-dex/internal/gui"
 	"github.com/Josje96/sql-dex/internal/pokedb"
 )
 
@@ -21,15 +22,17 @@ const defaultDBPath = "PokemonSQLTutorial-master/pokedex.sqlite"
 func main() {
 	dbPath := flag.String("db", defaultDBPath, "path to the pokédex SQLite file")
 	query := flag.String("q", "", "run a single query and exit (non-interactive)")
+	guiMode := flag.Bool("gui", false, "launch the web GUI instead of the CLI")
+	addr := flag.String("addr", "localhost:8080", "address for the web GUI to listen on")
 	flag.Parse()
 
-	if err := run(*dbPath, *query); err != nil {
+	if err := run(*dbPath, *query, *guiMode, *addr); err != nil {
 		fmt.Fprintf(os.Stderr, "sql-dex: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(dbPath, oneShot string) error {
+func run(dbPath, oneShot string, guiMode bool, addr string) error {
 	db, err := pokedb.Open(dbPath)
 	if err != nil {
 		return err
@@ -37,6 +40,16 @@ func run(dbPath, oneShot string) error {
 	defer db.Close()
 
 	ctx := context.Background()
+
+	// -gui serves the Phase 2 web interface.
+	if guiMode {
+		srv, err := gui.NewServer(ctx, db)
+		if err != nil {
+			return err
+		}
+		return srv.Listen(addr)
+	}
+
 	shell := cli.New(db, os.Stdin, os.Stdout)
 
 	// -q runs a single query for scripting/piping, then exits.
