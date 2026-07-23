@@ -1,0 +1,8 @@
+# Compiled binaries
+/sql-dex
+/sql-dex.exe
+*.exe
+
+# Go build/test artifacts
+/dist/
+*.out
