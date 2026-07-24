@@ -11,3 +11,6 @@
 .env
 .env.*
 !.env.example
+
+# Experimental Go coding game spike
+/go-code-tool/
