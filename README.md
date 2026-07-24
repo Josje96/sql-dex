@@ -4,16 +4,16 @@ A little SQL game. You write SQL against a full Pokemon database and learn SQL a
 
 ## What it is
 
-SQL-Dex hands you a real, messy, 170-table Pokemon database (the veekun pokedex) and lets you query it. It comes in two flavors:
+SQL-Dex hands you a 170-table Pokemon database (the veekun pokedex) and lets you query it. It comes in two flavors:
 
 - a CLI where you type SQL and get results back
 - a web app with two editors (yours and a tutor pane), a searchable SQL 101 guide, an examples list, a notepad for looking things up, and pokedex sprites that show up next to your results
 
-There is also an optional AI tutor. It does not hand you the answer. It nudges you toward it with hints and small examples, so you actually learn instead of copy pasting.
+There is also an optional AI tutor. It does not hand you the answer. It nudges you toward it with hints and small examples, so you learn instead of copy pasting.
 
 ## Why it's here
 
-Learning SQL from toy tables is boring. This uses data you actually care about and gives you a safe place to poke around. The database is opened read only, so you cannot break anything. Query away.
+Learning SQL from toy tables is boring. This uses data you actually (might) know about and gives you a safe place to poke around. The database is opened read only, so you cannot break anything.
 
 ## Running it on a fresh machine
 
@@ -53,4 +53,4 @@ Open `.env`, pick a provider, and fill in the three values (`AI_API_KEY`, `AI_BA
 ## Branches
 
 - `main` is the full app (CLI plus web app plus tutor)
-- `CLI` is a snapshot if you only want the terminal experience
+- `CLI` is a snapshot if you only want the terminal experience the cli doesnt include the ai tutor
