@@ -33,6 +33,12 @@ YOUR TEACHING RULES — follow them strictly:
 - If the learner's query has an error, point at the cause and nudge them to the fix
   instead of rewriting it for them.
 - Be encouraging and concise. Prefer 2-5 short sentences or a couple of bullet points.
+- Whenever you name a new SQL clause or concept (WHERE, JOIN, ORDER BY, GROUP BY,
+  COUNT, ...), include a SHORT analogous example that uses DIFFERENT tables or a
+  different goal than the learner's task — so they see the pattern in action
+  without being handed their exact answer. Introduce it with "For example,".
+- You have the recent conversation for context; build on earlier hints instead of
+  repeating them, and acknowledge progress the learner has made.
 
 USEFUL SCHEMA NOTES:
 - pokemon_species(id, identifier, generation_id, ...): one row per species; id is the
@@ -67,17 +73,28 @@ func New(apiKey string) *Tutor {
 // Enabled reports whether an API key is configured.
 func (t *Tutor) Enabled() bool { return t.apiKey != "" }
 
-// Ask sends the learner's question along with their current query for context
-// and returns the tutor's guidance.
-func (t *Tutor) Ask(ctx context.Context, question, currentSQL string) (string, error) {
+// historyWindow is how many prior messages of the conversation we replay to
+// give the tutor a rolling short-term memory.
+const historyWindow = 5
+
+// Message is one prior turn in the conversation. Role is "user" or "tutor".
+type Message struct {
+	Role string
+	Text string
+}
+
+// Ask sends the learner's question (plus their current query for context) and
+// the recent conversation history, returning the tutor's guidance.
+func (t *Tutor) Ask(ctx context.Context, question, currentSQL string, history []Message) (string, error) {
 	if !t.Enabled() {
 		return "", fmt.Errorf("tutor is not configured (no API key)")
 	}
 
 	userText := buildUserMessage(question, currentSQL)
+	contents := buildContents(history, userText)
 	reqBody := geminiRequest{
 		SystemInstruction: &content{Parts: []part{{Text: systemPrompt}}},
-		Contents:          []content{{Role: "user", Parts: []part{{Text: userText}}}},
+		Contents:          contents,
 		GenerationConfig: &generationConfig{
 			Temperature:     0.4,
 			MaxOutputTokens: 800,
@@ -119,6 +136,30 @@ func (t *Tutor) Ask(ctx context.Context, question, currentSQL string) (string, e
 		return "", fmt.Errorf("the tutor had no response (the request may have been blocked)")
 	}
 	return text, nil
+}
+
+// buildContents turns the recent history plus the new question into Gemini's
+// contents array. It keeps only the last historyWindow messages and ensures the
+// sequence starts with a user turn (Gemini expects user-first, alternating).
+func buildContents(history []Message, userText string) []content {
+	if len(history) > historyWindow {
+		history = history[len(history)-historyWindow:]
+	}
+	// Drop any leading tutor/model turns left over from the trim window.
+	for len(history) > 0 && history[0].Role == "tutor" {
+		history = history[1:]
+	}
+
+	contents := make([]content, 0, len(history)+1)
+	for _, m := range history {
+		role := "user"
+		if m.Role == "tutor" {
+			role = "model"
+		}
+		contents = append(contents, content{Role: role, Parts: []part{{Text: m.Text}}})
+	}
+	contents = append(contents, content{Role: "user", Parts: []part{{Text: userText}}})
+	return contents
 }
 
 // buildUserMessage combines the learner's question with their current query so

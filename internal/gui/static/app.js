@@ -83,9 +83,9 @@ function showError(message) {
   spriteStrip.hidden = true;
 }
 
-function renderTable(columns, rows) {
+function renderTable(columns, rows, target = resultArea) {
   if (columns.length === 0) {
-    resultArea.innerHTML = '<p class="placeholder">Query ran, but returned no columns.</p>';
+    target.innerHTML = '<p class="placeholder">Query ran, but returned no columns.</p>';
     return;
   }
   const table = document.createElement("table");
@@ -118,8 +118,8 @@ function renderTable(columns, rows) {
   }
   table.appendChild(tbody);
 
-  resultArea.innerHTML = "";
-  resultArea.appendChild(table);
+  target.innerHTML = "";
+  target.appendChild(table);
 }
 
 // renderSprites shows a pokédex-style strip of any Pokémon found in the results.
@@ -310,6 +310,11 @@ const tutorInput = document.getElementById("tutorInput");
 const tutorSend = document.getElementById("tutorSend");
 const tutorHints = document.getElementById("tutorHints");
 
+// Rolling conversation memory: each entry is { role: "user"|"tutor", text }.
+// We send the recent slice with every request so the tutor remembers context.
+const tutorMemory = [];
+const TUTOR_MEMORY_MAX = 5;
+
 // addBubble appends a chat bubble and returns it (so we can update "thinking").
 function addBubble(who, text, extra) {
   const empty = tutorHints.querySelector(".tutor-empty");
@@ -336,22 +341,28 @@ function renderHint(bubble, text) {
 async function askTutor(event) {
   event.preventDefault();
   const question = tutorInput.value.trim();
-  addBubble("you", question || "(give me a hint on my current query)");
+  const shownQuestion = question || "(give me a hint on my current query)";
+  addBubble("you", shownQuestion);
   tutorInput.value = "";
   tutorInput.disabled = true;
   tutorSend.disabled = true;
   const thinking = addBubble("tutor", "thinking…", "thinking");
 
+  // Send the rolling window of prior turns so the tutor has conversational memory.
+  const history = tutorMemory.slice(-TUTOR_MEMORY_MAX);
+
   try {
     const resp = await fetch("/api/tutor", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, sql: userEditor.getValue() }),
+      body: JSON.stringify({ question, sql: userEditor.getValue(), history }),
     });
     const data = await resp.json();
     if (data.hint) {
       thinking.className = "bubble tutor";
       renderHint(thinking, data.hint);
+      rememberTurn("user", shownQuestion);
+      rememberTurn("tutor", data.hint);
     } else {
       thinking.className = "bubble tutor error";
       thinking.textContent = data.error || "The tutor didn't respond.";
@@ -367,9 +378,129 @@ async function askTutor(event) {
   }
 }
 
+// rememberTurn appends to memory and trims it to the rolling window.
+function rememberTurn(role, text) {
+  tutorMemory.push({ role, text });
+  if (tutorMemory.length > TUTOR_MEMORY_MAX) {
+    tutorMemory.splice(0, tutorMemory.length - TUTOR_MEMORY_MAX);
+  }
+}
+
+// --- Notepad modal -----------------------------------------------------------
+
+const NOTEPAD_KEY = "sqldex-notepad";
+const NOTEPAD_SEED = `-- Notepad: a scratch space for looking things up.
+-- Put your cursor on a statement and hit Run (results show below).
+
+-- What tables exist?
+SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;
+
+-- What columns does a table have? (change the table name)
+PRAGMA table_info(pokemon_species);`;
+
+const notepadModal = document.getElementById("notepadModal");
+const notepadBtn = document.getElementById("notepadBtn");
+const notepadMeta = document.getElementById("notepadMeta");
+const notepadResults = document.getElementById("notepadResults");
+
+const notepadEditor = makeEditor("notepadEditor", {});
+notepadEditor.setValue(localStorage.getItem(NOTEPAD_KEY) ?? NOTEPAD_SEED);
+// Persist on every change so scratch work survives reloads.
+notepadEditor.on("change", () => {
+  localStorage.setItem(NOTEPAD_KEY, notepadEditor.getValue());
+});
+
+function openNotepad() {
+  notepadModal.hidden = false;
+  // CodeMirror needs a refresh after becoming visible to size/paint correctly.
+  setTimeout(() => notepadEditor.refresh(), 0);
+  notepadEditor.focus();
+}
+function closeNotepad() {
+  notepadModal.hidden = true;
+}
+
+// currentStatement returns the selected text, or the ;-delimited statement that
+// the cursor sits in — so "click a query, hit Run" just works.
+function currentStatement(cm) {
+  const sel = cm.getSelection().trim();
+  if (sel) return sel;
+  const full = cm.getValue();
+  const at = cm.indexFromPos(cm.getCursor());
+  let start = 0;
+  for (let i = 0; i <= full.length; i++) {
+    if (i === full.length || full[i] === ";") {
+      if (at <= i) return full.slice(start, i).trim();
+      start = i + 1;
+    }
+  }
+  return full.trim();
+}
+
+async function runNotepad() {
+  // Strip comment-only lines so running a commented block doesn't hit the DB.
+  const sql = currentStatement(notepadEditor)
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n")
+    .trim();
+  if (!sql) {
+    notepadMeta.textContent = "Nothing to run — put your cursor on a SQL statement.";
+    notepadMeta.className = "result-meta";
+    return;
+  }
+  notepadMeta.textContent = "Running…";
+  notepadMeta.className = "result-meta";
+  const started = performance.now();
+  try {
+    const resp = await fetch("/api/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql }),
+    });
+    const data = await resp.json();
+    const ms = Math.round(performance.now() - started);
+    if (data.error) {
+      notepadMeta.textContent = "Error: " + data.error;
+      notepadMeta.className = "result-meta error";
+      notepadResults.innerHTML = "";
+      return;
+    }
+    renderTable(data.columns || [], data.rows || [], notepadResults);
+    const n = (data.rows || []).length;
+    notepadMeta.textContent = `${n} row${n === 1 ? "" : "s"} · ${ms} ms`;
+    notepadMeta.className = "result-meta ok";
+  } catch (err) {
+    notepadMeta.textContent = "Could not reach the server: " + err.message;
+    notepadMeta.className = "result-meta error";
+  }
+}
+
 // --- Event wiring -------------------------------------------------------------
 
 tutorForm.addEventListener("submit", askTutor);
+
+notepadBtn.addEventListener("click", openNotepad);
+document.getElementById("notepadRun").addEventListener("click", runNotepad);
+document.getElementById("notepadGrab").addEventListener("click", () => {
+  notepadEditor.setValue(userEditor.getValue());
+  notepadEditor.focus();
+});
+document.getElementById("notepadSend").addEventListener("click", () => {
+  userEditor.setValue(notepadEditor.getValue());
+  closeNotepad();
+  userEditor.focus();
+});
+document.getElementById("notepadClear").addEventListener("click", () => {
+  notepadEditor.setValue(NOTEPAD_SEED);
+  notepadResults.innerHTML = "";
+  notepadMeta.textContent = "";
+});
+notepadModal.addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-close")) closeNotepad();
+});
+// Ctrl/Cmd+Enter runs the notepad statement while it's focused.
+notepadEditor.setOption("extraKeys", { "Ctrl-Enter": runNotepad, "Cmd-Enter": runNotepad });
 
 runBtn.addEventListener("click", runQuery);
 examplesBtn.addEventListener("click", openExamples);
@@ -395,6 +526,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!modal.hidden) closeExamples();
   if (!guideModal.hidden) closeGuide();
+  if (!notepadModal.hidden) closeNotepad();
 });
 
 // Ctrl/Cmd+Enter runs the query from anywhere in the user editor.

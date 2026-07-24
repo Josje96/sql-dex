@@ -337,4 +337,22 @@ td.null { color: var(--muted); font-style: italic; }
   background: var(--accent); color: #1a1a1a; border-radius: 2px; padding: 0 1px;
 }
 
+/* ---- Notepad modal ---- */
+.modal-wide { width: min(820px, 94vw); }
+.notepad-toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.notepad-toolbar .btn { padding: 0.4rem 0.7rem; font-size: 0.82rem; }
+#notepadModal .CodeMirror {
+  height: 170px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+}
+.notepad-results {
+  margin-top: 0.4rem;
+  max-height: 34vh;
+  overflow: auto;
+}
+.notepad-results table.grid th { top: -1px; }
+
 [hidden] { display: none !important; }

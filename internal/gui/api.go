@@ -3,6 +3,8 @@ package gui
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/Josje96/sql-dex/internal/tutor"
 )
 
 // queryRequest is the JSON body posted to /api/query.
@@ -76,10 +78,17 @@ func (s *Server) handleGuide(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"guide": guide})
 }
 
+// tutorMessage is one prior turn of the conversation sent from the client.
+type tutorMessage struct {
+	Role string `json:"role"` // "user" or "tutor"
+	Text string `json:"text"`
+}
+
 // tutorRequest is the JSON body posted to /api/tutor.
 type tutorRequest struct {
-	Question string `json:"question"`
-	SQL      string `json:"sql"`
+	Question string         `json:"question"`
+	SQL      string         `json:"sql"`
+	History  []tutorMessage `json:"history"`
 }
 
 // tutorResponse carries the tutor's guidance, or an error / disabled flag.
@@ -107,7 +116,12 @@ func (s *Server) handleTutor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hint, err := s.tutor.Ask(r.Context(), req.Question, req.SQL)
+	history := make([]tutor.Message, len(req.History))
+	for i, m := range req.History {
+		history[i] = tutor.Message{Role: m.Role, Text: m.Text}
+	}
+
+	hint, err := s.tutor.Ask(r.Context(), req.Question, req.SQL, history)
 	if err != nil {
 		writeJSON(w, http.StatusOK, tutorResponse{Error: err.Error()})
 		return

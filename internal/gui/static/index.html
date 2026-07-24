@@ -18,6 +18,7 @@
       </div>
     </div>
     <div class="actions">
+      <button id="notepadBtn" class="btn">🗒 Notepad</button>
       <button id="guideBtn" class="btn">📚 SQL 101</button>
       <button id="examplesBtn" class="btn">📖 Examples</button>
       <button id="runBtn" class="btn btn-primary">▶ Run <span class="kbd">Ctrl↵</span></button>
@@ -87,6 +88,27 @@
       <input id="guideSearch" class="guide-search" type="search" autocomplete="off"
              placeholder="Search… (e.g. sort, columns, join, filter)">
       <div id="guideResults" class="guide-results"></div>
+    </div>
+  </div>
+
+  <!-- Notepad modal -->
+  <div id="notepadModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card modal-wide" role="dialog" aria-modal="true" aria-labelledby="notepadTitle">
+      <div class="modal-head">
+        <h2 id="notepadTitle">🗒 Notepad</h2>
+        <button class="icon-btn" data-close aria-label="Close">✕</button>
+      </div>
+      <p class="modal-sub">A scratch space for quick lookups — check table names, columns, anything — without disturbing your main query. Saved in your browser. Run the statement your cursor is on (or a selection).</p>
+      <div class="notepad-toolbar">
+        <button id="notepadRun" class="btn btn-primary">▶ Run</button>
+        <button id="notepadGrab" class="btn" title="Copy your editor's query into the notepad">↤ Grab my query</button>
+        <button id="notepadSend" class="btn" title="Copy the notepad into your editor">↦ Send to my editor</button>
+        <button id="notepadClear" class="btn" title="Reset the notepad">Clear</button>
+      </div>
+      <textarea id="notepadEditor"></textarea>
+      <div id="notepadMeta" class="result-meta"></div>
+      <div id="notepadResults" class="notepad-results"></div>
     </div>
   </div>
 
