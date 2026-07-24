@@ -205,7 +205,73 @@ function buildExamples(list) {
   }
 }
 
+// --- Tutor (Phase 3 AI helper) -----------------------------------------------
+
+const tutorForm = document.getElementById("tutorForm");
+const tutorInput = document.getElementById("tutorInput");
+const tutorSend = document.getElementById("tutorSend");
+const tutorHints = document.getElementById("tutorHints");
+
+// addBubble appends a chat bubble and returns it (so we can update "thinking").
+function addBubble(who, text, extra) {
+  const empty = tutorHints.querySelector(".tutor-empty");
+  if (empty) empty.remove();
+  const b = document.createElement("div");
+  b.className = "bubble " + who + (extra ? " " + extra : "");
+  b.textContent = text;
+  tutorHints.appendChild(b);
+  tutorHints.scrollTop = tutorHints.scrollHeight;
+  return b;
+}
+
+// Render a light bit of markdown: `code` spans and **bold**, escaped safely.
+function renderHint(bubble, text) {
+  const esc = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  bubble.innerHTML = esc
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
+async function askTutor(event) {
+  event.preventDefault();
+  const question = tutorInput.value.trim();
+  addBubble("you", question || "(give me a hint on my current query)");
+  tutorInput.value = "";
+  tutorInput.disabled = true;
+  tutorSend.disabled = true;
+  const thinking = addBubble("tutor", "thinking…", "thinking");
+
+  try {
+    const resp = await fetch("/api/tutor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, sql: userEditor.getValue() }),
+    });
+    const data = await resp.json();
+    if (data.hint) {
+      thinking.className = "bubble tutor";
+      renderHint(thinking, data.hint);
+    } else {
+      thinking.className = "bubble tutor error";
+      thinking.textContent = data.error || "The tutor didn't respond.";
+    }
+  } catch (err) {
+    thinking.className = "bubble tutor error";
+    thinking.textContent = "Could not reach the tutor: " + err.message;
+  } finally {
+    tutorInput.disabled = false;
+    tutorSend.disabled = false;
+    tutorInput.focus();
+    tutorHints.scrollTop = tutorHints.scrollHeight;
+  }
+}
+
 // --- Event wiring -------------------------------------------------------------
+
+tutorForm.addEventListener("submit", askTutor);
 
 runBtn.addEventListener("click", runQuery);
 examplesBtn.addEventListener("click", openExamples);

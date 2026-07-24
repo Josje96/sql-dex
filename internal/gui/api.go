@@ -72,6 +72,45 @@ func (s *Server) handleExamples(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"examples": examples})
 }
 
+// tutorRequest is the JSON body posted to /api/tutor.
+type tutorRequest struct {
+	Question string `json:"question"`
+	SQL      string `json:"sql"`
+}
+
+// tutorResponse carries the tutor's guidance, or an error / disabled flag.
+type tutorResponse struct {
+	Hint     string `json:"hint,omitempty"`
+	Error    string `json:"error,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
+}
+
+func (s *Server) handleTutor(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.tutor == nil || !s.tutor.Enabled() {
+		writeJSON(w, http.StatusOK, tutorResponse{
+			Disabled: true,
+			Error:    "The tutor is off. Add GOOGLE=<your Gemini API key> to a .env file and restart.",
+		})
+		return
+	}
+	var req tutorRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, tutorResponse{Error: "invalid request body"})
+		return
+	}
+
+	hint, err := s.tutor.Ask(r.Context(), req.Question, req.SQL)
+	if err != nil {
+		writeJSON(w, http.StatusOK, tutorResponse{Error: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, tutorResponse{Hint: hint})
+}
+
 // writeJSON encodes v as JSON with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

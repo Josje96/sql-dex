@@ -14,12 +14,16 @@ import (
 	"github.com/Josje96/sql-dex/internal/cli"
 	"github.com/Josje96/sql-dex/internal/gui"
 	"github.com/Josje96/sql-dex/internal/pokedb"
+	"github.com/Josje96/sql-dex/internal/tutor"
 )
 
 // defaultDBPath points at the pokédex bundled with the tutorial data.
 const defaultDBPath = "PokemonSQLTutorial-master/pokedex.sqlite"
 
 func main() {
+	// Load .env early so the Gemini API key is available for the tutor.
+	loadDotEnv(".env")
+
 	dbPath := flag.String("db", defaultDBPath, "path to the pokédex SQLite file")
 	query := flag.String("q", "", "run a single query and exit (non-interactive)")
 	guiMode := flag.Bool("gui", false, "launch the web GUI instead of the CLI")
@@ -41,9 +45,10 @@ func run(dbPath, oneShot string, guiMode bool, addr string) error {
 
 	ctx := context.Background()
 
-	// -gui serves the Phase 2 web interface.
+	// -gui serves the Phase 2 web interface (with the Phase 3 tutor if a key is set).
 	if guiMode {
-		srv, err := gui.NewServer(ctx, db)
+		coach := tutor.New(os.Getenv("GOOGLE"))
+		srv, err := gui.NewServer(ctx, db, coach)
 		if err != nil {
 			return err
 		}

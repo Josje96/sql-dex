@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/Josje96/sql-dex/internal/pokedb"
+	"github.com/Josje96/sql-dex/internal/tutor"
 )
 
 //go:embed static
@@ -20,15 +21,17 @@ var staticFS embed.FS
 type Server struct {
 	db      *pokedb.DB
 	sprites *spriteIndex
+	tutor   *tutor.Tutor
 }
 
 // NewServer builds the server and pre-loads the sprite index from the database.
-func NewServer(ctx context.Context, db *pokedb.DB) (*Server, error) {
+// coach may be a disabled tutor (no API key); the /api/tutor route reports that.
+func NewServer(ctx context.Context, db *pokedb.DB, coach *tutor.Tutor) (*Server, error) {
 	idx, err := buildSpriteIndex(ctx, db)
 	if err != nil {
 		return nil, err
 	}
-	return &Server{db: db, sprites: idx}, nil
+	return &Server{db: db, sprites: idx, tutor: coach}, nil
 }
 
 // Handler returns the router with API routes and the embedded static frontend.
@@ -38,6 +41,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/tables", s.handleTables)
 	mux.HandleFunc("/api/schema", s.handleSchema)
 	mux.HandleFunc("/api/examples", s.handleExamples)
+	mux.HandleFunc("/api/tutor", s.handleTutor)
 
 	// Serve the frontend from the embedded static/ directory at the web root.
 	sub, err := fs.Sub(staticFS, "static")

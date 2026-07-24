@@ -6,3 +6,8 @@
 # Go build/test artifacts
 /dist/
 *.out
+
+# Secrets — never commit API keys
+.env
+.env.*
+!.env.example

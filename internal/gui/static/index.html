@@ -35,10 +35,20 @@
       <div class="pane">
         <div class="pane-head">
           <span class="pane-title">Tutor</span>
-          <span class="pane-hint">examples &amp; hints appear here — retype them to learn</span>
+          <span class="pane-hint">examples land here — retype them to learn</span>
           <button id="copyToUser" class="mini-btn" title="Copy tutor query into your editor">↤ use this</button>
         </div>
         <textarea id="tutorEditor"></textarea>
+        <div class="tutor-dock">
+          <div id="tutorHints" class="tutor-hints">
+            <p class="tutor-empty">Stuck? Ask for a <strong>hint</strong> — the tutor nudges you toward the answer, it won't just hand it over.</p>
+          </div>
+          <form id="tutorForm" class="tutor-form">
+            <input id="tutorInput" type="text" autocomplete="off"
+                   placeholder="e.g. how do I only get Fire-type Pokémon?">
+            <button id="tutorSend" type="submit" class="btn btn-primary">Ask</button>
+          </form>
+        </div>
       </div>
     </section>
 
