@@ -343,8 +343,43 @@ td.null { color: var(--muted); font-style: italic; }
   background: var(--accent); color: #1a1a1a; border-radius: 2px; padding: 0 1px;
 }
 
+/* ---- Challenge status bar (above results) ---- */
+.challenge-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.challenge-bar .spacer { flex: 1; }
+.challenge-bar.working { border-left: 3px solid var(--accent); }
+.challenge-bar.miss { border-left: 3px solid var(--danger); }
+.challenge-bar.solved {
+  color: #1e272e;
+  background: var(--lime);
+  border-left: 3px solid #1e272e;
+}
+.challenge-bar.solved .mini-btn { color: #1e272e; border-color: rgba(30,39,46,0.4); }
+
 /* ---- Challenges modal ---- */
+.head-left { display: flex; align-items: baseline; gap: 0.6rem; }
+.challenge-progress { font-size: 0.8rem; color: var(--muted); }
 .challenges-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.challenge.solved { border-color: var(--lime); }
+.solved-tag { color: var(--lime); font-size: 0.72rem; font-weight: 700; }
+.mark-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  margin-left: auto;
+}
+.mark-btn:hover { color: var(--text); border-color: var(--accent-2); }
 .challenge {
   border: 1px solid var(--border);
   border-radius: var(--radius);

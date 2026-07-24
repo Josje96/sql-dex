@@ -65,6 +65,8 @@ async function runQuery() {
     renderSprites(data.sprites || []);
     const n = (data.rows || []).length;
     setMeta(`${n} row${n === 1 ? "" : "s"} · ${ms} ms`, "ok");
+    // If a challenge is active, auto-check whether this query solved it.
+    if (activeChallenge) checkActiveChallenge(sql);
   } catch (err) {
     showError("Could not reach the server: " + err.message);
   } finally {
@@ -391,20 +393,41 @@ function rememberTurn(role, text) {
 const challengesModal = document.getElementById("challengesModal");
 const challengesBtn = document.getElementById("challengesBtn");
 const challengesList = document.getElementById("challengesList");
-let challengesLoaded = false;
+const challengeProgress = document.getElementById("challengeProgress");
+const challengeBar = document.getElementById("challengeBar");
+const challengeBarText = document.getElementById("challengeBarText");
+
+// Solved challenge ids persist in the browser. activeChallenge is the one the
+// learner is currently working on (auto-checked when they run a query).
+const SOLVED_KEY = "sqldex-solved";
+let solvedSet = loadSolved();
+let challengesData = null;
+let activeChallenge = null;
+
+function loadSolved() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SOLVED_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function saveSolved() {
+  localStorage.setItem(SOLVED_KEY, JSON.stringify([...solvedSet]));
+}
 
 async function openChallenges() {
-  if (!challengesLoaded) {
+  if (challengesData === null) {
     try {
       const resp = await fetch("/api/challenges");
       const data = await resp.json();
-      buildChallenges(data.challenges || []);
-      challengesLoaded = true;
+      challengesData = data.challenges || [];
     } catch (err) {
+      challengesData = [];
       challengesList.innerHTML =
         '<p class="guide-empty">Could not load challenges: ' + escapeHtml(err.message) + "</p>";
     }
   }
+  renderChallenges();
   challengesModal.hidden = false;
 }
 
@@ -412,11 +435,13 @@ function closeChallenges() {
   challengesModal.hidden = true;
 }
 
-function buildChallenges(list) {
+function renderChallenges() {
+  if (!challengesData) return;
   challengesList.innerHTML = "";
-  for (const c of list) {
+  for (const c of challengesData) {
+    const solved = solvedSet.has(c.id);
     const card = document.createElement("div");
-    card.className = "challenge";
+    card.className = "challenge" + (solved ? " solved" : "");
 
     const head = document.createElement("div");
     head.className = "challenge-head";
@@ -426,6 +451,12 @@ function buildChallenges(list) {
     const h3 = document.createElement("h3");
     h3.textContent = c.title;
     head.append(badge, h3);
+    if (solved) {
+      const tag = document.createElement("span");
+      tag.className = "solved-tag";
+      tag.textContent = "✓ Solved";
+      head.append(tag);
+    }
 
     const task = document.createElement("p");
     task.className = "task";
@@ -446,22 +477,96 @@ function buildChallenges(list) {
     hint.textContent = c.hint;
     details.append(summary, hint);
 
-    actions.append(startBtn, details);
+    // Manual override, in case the auto-check ever disagrees with you.
+    const markBtn = document.createElement("button");
+    markBtn.className = "mark-btn";
+    markBtn.textContent = solved ? "Mark unsolved" : "Mark solved";
+    markBtn.addEventListener("click", () => toggleSolved(c.id));
+
+    actions.append(startBtn, details, markBtn);
     card.append(head, task, actions);
     challengesList.appendChild(card);
+  }
+  updateProgress();
+}
+
+function updateProgress() {
+  if (!challengesData) return;
+  const solved = challengesData.filter((c) => solvedSet.has(c.id)).length;
+  challengeProgress.textContent = `${solved} / ${challengesData.length} solved`;
+}
+
+function toggleSolved(id) {
+  if (solvedSet.has(id)) solvedSet.delete(id);
+  else solvedSet.add(id);
+  saveSolved();
+  renderChallenges();
+  if (activeChallenge && activeChallenge.id === id) renderChallengeBar();
+}
+
+function markSolved(id) {
+  if (!solvedSet.has(id)) {
+    solvedSet.add(id);
+    saveSolved();
+    if (!challengesModal.hidden) renderChallenges();
+    else updateProgress();
   }
 }
 
 // startChallenge scaffolds the task into the user's editor as comments so they
-// can write their solution right underneath, then closes the modal.
+// can write their solution underneath, sets it active, and shows the status bar.
 function startChallenge(c) {
-  const scaffold =
-    `-- Challenge (${c.difficulty}): ${c.title}\n` +
-    `-- ${c.task}\n\n`;
+  activeChallenge = c;
+  const scaffold = `-- Challenge (${c.difficulty}): ${c.title}\n-- ${c.task}\n\n`;
   userEditor.setValue(scaffold);
   userEditor.setCursor(userEditor.lineCount(), 0);
+  renderChallengeBar();
   closeChallenges();
   userEditor.focus();
+}
+
+function renderChallengeBar(state) {
+  if (!activeChallenge) {
+    challengeBar.hidden = true;
+    return;
+  }
+  const solved = solvedSet.has(activeChallenge.id);
+  let cls = "challenge-bar ";
+  let text;
+  if (solved || state === "solved") {
+    cls += "solved";
+    text = `✅ Solved: ${activeChallenge.title}`;
+  } else if (state === "miss") {
+    cls += "miss";
+    text = `🎯 ${activeChallenge.title} — not matching yet, keep going`;
+  } else {
+    cls += "working";
+    text = `🎯 Working on: ${activeChallenge.title}`;
+  }
+  challengeBar.className = cls;
+  challengeBarText.textContent = text;
+  challengeBar.hidden = false;
+}
+
+// checkActiveChallenge asks the server whether sql solves the active challenge.
+async function checkActiveChallenge(sql) {
+  if (!activeChallenge) return;
+  try {
+    const resp = await fetch("/api/challenge/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: activeChallenge.id, sql }),
+    });
+    const data = await resp.json();
+    if (data.solved) {
+      markSolved(activeChallenge.id);
+      renderChallengeBar("solved");
+    } else {
+      renderChallengeBar("miss");
+    }
+  } catch {
+    /* network hiccup: leave the bar as-is */
+  }
 }
 
 // --- Notepad modal -----------------------------------------------------------
@@ -593,6 +698,13 @@ guideModal.addEventListener("click", (e) => {
 challengesBtn.addEventListener("click", openChallenges);
 challengesModal.addEventListener("click", (e) => {
   if (e.target.hasAttribute("data-close")) closeChallenges();
+});
+document.getElementById("challengeCheckBtn").addEventListener("click", () => {
+  checkActiveChallenge(userEditor.getValue());
+});
+document.getElementById("challengeClearBtn").addEventListener("click", () => {
+  activeChallenge = null;
+  renderChallengeBar();
 });
 
 // "use this" copies the tutor query into the user editor for those who want it.

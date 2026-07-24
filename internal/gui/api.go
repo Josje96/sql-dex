@@ -82,6 +82,58 @@ func (s *Server) handleChallenges(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"challenges": challenges})
 }
 
+// checkRequest is the JSON body posted to /api/challenge/check.
+type checkRequest struct {
+	ID  string `json:"id"`
+	SQL string `json:"sql"`
+}
+
+// checkResponse reports whether the learner's query solved the challenge.
+type checkResponse struct {
+	Solved  bool   `json:"solved"`
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req checkRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, checkResponse{Error: "invalid request body"})
+		return
+	}
+	ch, ok := challengeByID(req.ID)
+	if !ok {
+		writeJSON(w, http.StatusOK, checkResponse{Error: "unknown challenge"})
+		return
+	}
+
+	// Run the learner's query. SQL errors are expected feedback, not failures.
+	got, err := s.db.Query(r.Context(), req.SQL)
+	if err != nil {
+		writeJSON(w, http.StatusOK, checkResponse{Error: err.Error()})
+		return
+	}
+	// Run the trusted reference solution to compare against.
+	want, err := s.db.Query(r.Context(), ch.Solution)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, checkResponse{Error: "reference solution failed: " + err.Error()})
+		return
+	}
+
+	if resultsMatch(got, want) {
+		writeJSON(w, http.StatusOK, checkResponse{Solved: true, Message: "Correct! Challenge solved."})
+		return
+	}
+	writeJSON(w, http.StatusOK, checkResponse{
+		Solved:  false,
+		Message: "Not quite — your result set doesn't match the answer yet. Keep going!",
+	})
+}
+
 // tutorMessage is one prior turn of the conversation sent from the client.
 type tutorMessage struct {
 	Role string `json:"role"` // "user" or "tutor"

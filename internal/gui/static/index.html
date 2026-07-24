@@ -56,6 +56,12 @@
     </section>
 
     <section class="results">
+      <div id="challengeBar" class="challenge-bar" hidden>
+        <span id="challengeBarText"></span>
+        <span class="spacer"></span>
+        <button id="challengeCheckBtn" class="mini-btn">Check answer</button>
+        <button id="challengeClearBtn" class="mini-btn" title="Stop working on this challenge">✕</button>
+      </div>
       <div id="spriteStrip" class="sprite-strip" hidden></div>
       <div id="resultMeta" class="result-meta"></div>
       <div id="resultArea" class="result-area">
@@ -97,10 +103,13 @@
     <div class="modal-backdrop" data-close></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="challengesTitle">
       <div class="modal-head">
-        <h2 id="challengesTitle">🏆 Challenges</h2>
+        <div class="head-left">
+          <h2 id="challengesTitle">🏆 Challenges</h2>
+          <span id="challengeProgress" class="challenge-progress"></span>
+        </div>
         <button class="icon-btn" data-close aria-label="Close">✕</button>
       </div>
-      <p class="modal-sub">Your north star. Pick one, hit <strong>Start</strong> to drop it into your editor, and write the query. Stuck? Peek at the hint or ask the Tutor.</p>
+      <p class="modal-sub">Your north star. Pick one, hit <strong>Start</strong> to drop it into your editor, and write the query. Run it and your answer is checked automatically. Stuck? Peek at the hint or ask the Tutor.</p>
       <div id="challengesList" class="challenges-list"></div>
     </div>
   </div>

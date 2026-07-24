@@ -43,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/examples", s.handleExamples)
 	mux.HandleFunc("/api/guide", s.handleGuide)
 	mux.HandleFunc("/api/challenges", s.handleChallenges)
+	mux.HandleFunc("/api/challenge/check", s.handleCheck)
 	mux.HandleFunc("/api/tutor", s.handleTutor)
 
 	// Serve the frontend from the embedded static/ directory at the web root.
