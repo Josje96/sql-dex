@@ -386,6 +386,84 @@ function rememberTurn(role, text) {
   }
 }
 
+// --- Challenges modal --------------------------------------------------------
+
+const challengesModal = document.getElementById("challengesModal");
+const challengesBtn = document.getElementById("challengesBtn");
+const challengesList = document.getElementById("challengesList");
+let challengesLoaded = false;
+
+async function openChallenges() {
+  if (!challengesLoaded) {
+    try {
+      const resp = await fetch("/api/challenges");
+      const data = await resp.json();
+      buildChallenges(data.challenges || []);
+      challengesLoaded = true;
+    } catch (err) {
+      challengesList.innerHTML =
+        '<p class="guide-empty">Could not load challenges: ' + escapeHtml(err.message) + "</p>";
+    }
+  }
+  challengesModal.hidden = false;
+}
+
+function closeChallenges() {
+  challengesModal.hidden = true;
+}
+
+function buildChallenges(list) {
+  challengesList.innerHTML = "";
+  for (const c of list) {
+    const card = document.createElement("div");
+    card.className = "challenge";
+
+    const head = document.createElement("div");
+    head.className = "challenge-head";
+    const badge = document.createElement("span");
+    badge.className = "badge " + c.difficulty.toLowerCase();
+    badge.textContent = c.difficulty;
+    const h3 = document.createElement("h3");
+    h3.textContent = c.title;
+    head.append(badge, h3);
+
+    const task = document.createElement("p");
+    task.className = "task";
+    task.textContent = c.task;
+
+    const actions = document.createElement("div");
+    actions.className = "challenge-actions";
+    const startBtn = document.createElement("button");
+    startBtn.className = "btn btn-primary start-btn";
+    startBtn.textContent = "▶ Start";
+    startBtn.addEventListener("click", () => startChallenge(c));
+
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "Hint";
+    const hint = document.createElement("div");
+    hint.className = "hint-body";
+    hint.textContent = c.hint;
+    details.append(summary, hint);
+
+    actions.append(startBtn, details);
+    card.append(head, task, actions);
+    challengesList.appendChild(card);
+  }
+}
+
+// startChallenge scaffolds the task into the user's editor as comments so they
+// can write their solution right underneath, then closes the modal.
+function startChallenge(c) {
+  const scaffold =
+    `-- Challenge (${c.difficulty}): ${c.title}\n` +
+    `-- ${c.task}\n\n`;
+  userEditor.setValue(scaffold);
+  userEditor.setCursor(userEditor.lineCount(), 0);
+  closeChallenges();
+  userEditor.focus();
+}
+
 // --- Notepad modal -----------------------------------------------------------
 
 const NOTEPAD_KEY = "sqldex-notepad";
@@ -512,6 +590,11 @@ guideModal.addEventListener("click", (e) => {
   if (e.target.hasAttribute("data-close")) closeGuide();
 });
 
+challengesBtn.addEventListener("click", openChallenges);
+challengesModal.addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-close")) closeChallenges();
+});
+
 // "use this" copies the tutor query into the user editor for those who want it.
 document.getElementById("copyToUser").addEventListener("click", () => {
   userEditor.setValue(tutorEditor.getValue());
@@ -527,6 +610,7 @@ document.addEventListener("keydown", (e) => {
   if (!modal.hidden) closeExamples();
   if (!guideModal.hidden) closeGuide();
   if (!notepadModal.hidden) closeNotepad();
+  if (!challengesModal.hidden) closeChallenges();
 });
 
 // Ctrl/Cmd+Enter runs the query from anywhere in the user editor.

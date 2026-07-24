@@ -18,6 +18,7 @@
       </div>
     </div>
     <div class="actions">
+      <button id="challengesBtn" class="btn">🏆 Challenges</button>
       <button id="notepadBtn" class="btn">🗒 Notepad</button>
       <button id="guideBtn" class="btn">📚 SQL 101</button>
       <button id="examplesBtn" class="btn">📖 Examples</button>
@@ -88,6 +89,19 @@
       <input id="guideSearch" class="guide-search" type="search" autocomplete="off"
              placeholder="Search… (e.g. sort, columns, join, filter)">
       <div id="guideResults" class="guide-results"></div>
+    </div>
+  </div>
+
+  <!-- Challenges modal -->
+  <div id="challengesModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="challengesTitle">
+      <div class="modal-head">
+        <h2 id="challengesTitle">🏆 Challenges</h2>
+        <button class="icon-btn" data-close aria-label="Close">✕</button>
+      </div>
+      <p class="modal-sub">Your north star. Pick one, hit <strong>Start</strong> to drop it into your editor, and write the query. Stuck? Peek at the hint or ask the Tutor.</p>
+      <div id="challengesList" class="challenges-list"></div>
     </div>
   </div>
 

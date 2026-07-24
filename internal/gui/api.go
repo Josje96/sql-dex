@@ -78,6 +78,10 @@ func (s *Server) handleGuide(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"guide": guide})
 }
 
+func (s *Server) handleChallenges(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"challenges": challenges})
+}
+
 // tutorMessage is one prior turn of the conversation sent from the client.
 type tutorMessage struct {
 	Role string `json:"role"` // "user" or "tutor"
