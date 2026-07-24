@@ -205,6 +205,104 @@ function buildExamples(list) {
   }
 }
 
+// --- SQL 101 guide modal -----------------------------------------------------
+
+const guideModal = document.getElementById("guideModal");
+const guideBtn = document.getElementById("guideBtn");
+const guideSearch = document.getElementById("guideSearch");
+const guideResults = document.getElementById("guideResults");
+let guideData = null;
+
+async function openGuide() {
+  if (guideData === null) {
+    try {
+      const resp = await fetch("/api/guide");
+      const data = await resp.json();
+      guideData = data.guide || [];
+    } catch (err) {
+      guideData = [];
+      guideResults.innerHTML =
+        '<p class="guide-empty">Could not load the guide: ' + escapeHtml(err.message) + "</p>";
+    }
+  }
+  renderGuide(guideSearch.value);
+  guideModal.hidden = false;
+  guideSearch.focus();
+}
+
+function closeGuide() {
+  guideModal.hidden = true;
+}
+
+// renderGuide filters topics by the search query and lays them out grouped by
+// category, with the matched text highlighted.
+function renderGuide(query) {
+  if (!guideData) return;
+  const q = query.trim().toLowerCase();
+  const matches = guideData.filter((t) => {
+    if (!q) return true;
+    const hay = (t.title + " " + t.body + " " + t.sql + " " + t.keywords + " " + t.category).toLowerCase();
+    return hay.includes(q);
+  });
+
+  guideResults.innerHTML = "";
+  if (matches.length === 0) {
+    const p = document.createElement("p");
+    p.className = "guide-empty";
+    p.textContent = 'No matches for "' + query.trim() + '". Try "sort", "join", or "columns".';
+    guideResults.appendChild(p);
+    return;
+  }
+
+  let lastCat = null;
+  for (const t of matches) {
+    if (t.category !== lastCat) {
+      const h = document.createElement("div");
+      h.className = "guide-cat";
+      h.textContent = t.category;
+      guideResults.appendChild(h);
+      lastCat = t.category;
+    }
+
+    const card = document.createElement("div");
+    card.className = "topic";
+
+    const head = document.createElement("div");
+    head.className = "topic-head";
+    const h3 = document.createElement("h3");
+    h3.innerHTML = highlight(t.title, q);
+    const tryBtn = document.createElement("button");
+    tryBtn.className = "try-btn";
+    tryBtn.textContent = "↳ try";
+    tryBtn.title = "Load this into the Tutor pane";
+    tryBtn.addEventListener("click", () => {
+      tutorEditor.setValue(t.sql);
+      closeGuide();
+    });
+    head.append(h3, tryBtn);
+
+    const p = document.createElement("p");
+    p.innerHTML = highlight(t.body, q);
+    const pre = document.createElement("pre");
+    pre.textContent = t.sql;
+
+    card.append(head, p, pre);
+    guideResults.appendChild(card);
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// highlight escapes text, then wraps case-insensitive matches of q in <mark>.
+function highlight(text, q) {
+  const safe = escapeHtml(text);
+  if (!q) return safe;
+  const escQ = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex metachars
+  return safe.replace(new RegExp("(" + escQ + ")", "gi"), "<mark>$1</mark>");
+}
+
 // --- Tutor (Phase 3 AI helper) -----------------------------------------------
 
 const tutorForm = document.getElementById("tutorForm");
@@ -275,6 +373,13 @@ tutorForm.addEventListener("submit", askTutor);
 
 runBtn.addEventListener("click", runQuery);
 examplesBtn.addEventListener("click", openExamples);
+guideBtn.addEventListener("click", openGuide);
+guideSearch.addEventListener("input", () => renderGuide(guideSearch.value));
+
+// Close the guide via ✕ or backdrop.
+guideModal.addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-close")) closeGuide();
+});
 
 // "use this" copies the tutor query into the user editor for those who want it.
 document.getElementById("copyToUser").addEventListener("click", () => {
@@ -287,7 +392,9 @@ modal.addEventListener("click", (e) => {
   if (e.target.hasAttribute("data-close")) closeExamples();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modal.hidden) closeExamples();
+  if (e.key !== "Escape") return;
+  if (!modal.hidden) closeExamples();
+  if (!guideModal.hidden) closeGuide();
 });
 
 // Ctrl/Cmd+Enter runs the query from anywhere in the user editor.

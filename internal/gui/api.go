@@ -72,6 +72,10 @@ func (s *Server) handleExamples(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"examples": examples})
 }
 
+func (s *Server) handleGuide(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"guide": guide})
+}
+
 // tutorRequest is the JSON body posted to /api/tutor.
 type tutorRequest struct {
 	Question string `json:"question"`

@@ -18,6 +18,7 @@
       </div>
     </div>
     <div class="actions">
+      <button id="guideBtn" class="btn">📚 SQL 101</button>
       <button id="examplesBtn" class="btn">📖 Examples</button>
       <button id="runBtn" class="btn btn-primary">▶ Run <span class="kbd">Ctrl↵</span></button>
     </div>
@@ -71,6 +72,21 @@
       </div>
       <p class="modal-sub">Load one into the <strong>Tutor</strong> pane, read it, then retype it yourself.</p>
       <ul id="examplesList" class="examples-list"></ul>
+    </div>
+  </div>
+
+  <!-- SQL 101 guide modal -->
+  <div id="guideModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+      <div class="modal-head">
+        <h2 id="guideTitle">SQL 101</h2>
+        <button class="icon-btn" data-close aria-label="Close">✕</button>
+      </div>
+      <p class="modal-sub">A quick reference for the basics. Search, read, then <strong>↳ try</strong> any snippet in the Tutor pane.</p>
+      <input id="guideSearch" class="guide-search" type="search" autocomplete="off"
+             placeholder="Search… (e.g. sort, columns, join, filter)">
+      <div id="guideResults" class="guide-results"></div>
     </div>
   </div>
 
