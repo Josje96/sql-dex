@@ -106,7 +106,7 @@ func (s *Server) handleTutor(w http.ResponseWriter, r *http.Request) {
 	if s.tutor == nil || !s.tutor.Enabled() {
 		writeJSON(w, http.StatusOK, tutorResponse{
 			Disabled: true,
-			Error:    "The tutor is off. Add GOOGLE=<your Gemini API key> to a .env file and restart.",
+			Error:    "The tutor is off. Set AI_API_KEY, AI_BASE_URL, and AI_MODEL (or just GOOGLE) in a .env file and restart. See .env.example.",
 		})
 		return
 	}

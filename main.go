@@ -47,7 +47,12 @@ func run(dbPath, oneShot string, guiMode bool, addr string) error {
 
 	// -gui serves the Phase 2 web interface (with the Phase 3 tutor if a key is set).
 	if guiMode {
-		coach := tutor.New(os.Getenv("GOOGLE"))
+		coach := tutor.New(tutorConfigFromEnv())
+		if coach.Enabled() {
+			fmt.Fprintf(os.Stderr, "tutor: %s\n", coach.Describe())
+		} else {
+			fmt.Fprintln(os.Stderr, "tutor: disabled (set AI_API_KEY + AI_BASE_URL + AI_MODEL, or GOOGLE, in .env)")
+		}
 		srv, err := gui.NewServer(ctx, db, coach)
 		if err != nil {
 			return err
@@ -62,4 +67,27 @@ func run(dbPath, oneShot string, guiMode bool, addr string) error {
 		return shell.RunOnce(ctx, oneShot)
 	}
 	return shell.Run(ctx)
+}
+
+// tutorConfigFromEnv reads the AI provider settings from the environment. As a
+// backward-compatible shortcut, a lone GOOGLE key targets Gemini's
+// OpenAI-compatible endpoint with a sensible default model.
+func tutorConfigFromEnv() tutor.Config {
+	cfg := tutor.Config{
+		APIKey:  os.Getenv("AI_API_KEY"),
+		BaseURL: os.Getenv("AI_BASE_URL"),
+		Model:   os.Getenv("AI_MODEL"),
+	}
+	if cfg.APIKey == "" {
+		if g := os.Getenv("GOOGLE"); g != "" {
+			cfg.APIKey = g
+			if cfg.BaseURL == "" {
+				cfg.BaseURL = tutor.GoogleOpenAIBaseURL
+			}
+			if cfg.Model == "" {
+				cfg.Model = "gemini-2.5-flash"
+			}
+		}
+	}
+	return cfg
 }

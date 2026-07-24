@@ -1,6 +1,11 @@
-// Package tutor implements the Phase 3 AI helper: a Socratic SQL coach backed
-// by Google's Gemini API. It is deliberately built to *guide* learners toward
-// the answer with hints, not to hand them a finished query.
+// Package tutor implements the Phase 3 AI helper: a Socratic SQL coach that
+// guides learners toward the answer with hints instead of handing over a
+// finished query.
+//
+// It speaks the OpenAI-compatible "chat completions" API, so it works with many
+// providers just by changing the base URL, model, and key — OpenAI, DeepSeek,
+// SiliconFlow, OpenRouter, and Google Gemini (via its OpenAI-compatible
+// endpoint) all work.
 package tutor
 
 import (
@@ -13,13 +18,16 @@ import (
 	"time"
 )
 
-// defaultModel is Gemini 2.5 Flash — fast and inexpensive, a good fit for
-// short, interactive tutoring turns.
-const defaultModel = "gemini-2.5-flash"
+// GoogleOpenAIBaseURL is Gemini's OpenAI-compatible endpoint, used as the
+// default when only a Google key is supplied.
+const GoogleOpenAIBaseURL = "https://generativelanguage.googleapis.com/v1beta/openai"
 
-const apiBase = "https://generativelanguage.googleapis.com/v1beta/models/"
+const (
+	defaultBaseURL = "https://api.openai.com/v1"
+	defaultModel   = "gpt-4o-mini"
+)
 
-// systemPrompt shapes Gemini into a hint-giving tutor rather than an answer key.
+// systemPrompt shapes the model into a hint-giving tutor rather than an answer key.
 const systemPrompt = `You are SQL-Dex Tutor, a patient SQL coach inside a learning game.
 The learner writes SQLite queries against a Pokémon database (the "veekun" pokédex).
 
@@ -53,34 +61,56 @@ USEFUL SCHEMA NOTES:
 - generations(id): 1 = Kanto/Gen 1, etc.
 The database is READ-ONLY, so only SELECT queries work.`
 
-// Tutor talks to the Gemini API on the learner's behalf.
-type Tutor struct {
-	apiKey string
-	model  string
-	http   *http.Client
+// historyWindow is how many prior messages of the conversation we replay to
+// give the tutor a rolling short-term memory.
+const historyWindow = 5
+
+// Config selects the provider and model for the tutor.
+type Config struct {
+	APIKey  string // provider API key
+	BaseURL string // OpenAI-compatible base URL, e.g. https://api.deepseek.com/v1
+	Model   string // model name, e.g. deepseek-chat
 }
 
-// New returns a Tutor using the given API key. An empty key means the tutor is
-// disabled; callers should check Enabled.
-func New(apiKey string) *Tutor {
+// Message is one prior turn in the conversation. Role is "user" or "tutor".
+type Message struct {
+	Role string
+	Text string
+}
+
+// Tutor talks to an OpenAI-compatible chat API on the learner's behalf.
+type Tutor struct {
+	apiKey  string
+	baseURL string
+	model   string
+	http    *http.Client
+}
+
+// New builds a Tutor from cfg, filling in sensible defaults. An empty API key
+// means the tutor is disabled; callers should check Enabled.
+func New(cfg Config) *Tutor {
+	base := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
+	if base == "" {
+		base = defaultBaseURL
+	}
+	model := strings.TrimSpace(cfg.Model)
+	if model == "" {
+		model = defaultModel
+	}
 	return &Tutor{
-		apiKey: strings.TrimSpace(apiKey),
-		model:  defaultModel,
-		http:   &http.Client{Timeout: 30 * time.Second},
+		apiKey:  strings.TrimSpace(cfg.APIKey),
+		baseURL: base,
+		model:   model,
+		http:    &http.Client{Timeout: 45 * time.Second},
 	}
 }
 
 // Enabled reports whether an API key is configured.
 func (t *Tutor) Enabled() bool { return t.apiKey != "" }
 
-// historyWindow is how many prior messages of the conversation we replay to
-// give the tutor a rolling short-term memory.
-const historyWindow = 5
-
-// Message is one prior turn in the conversation. Role is "user" or "tutor".
-type Message struct {
-	Role string
-	Text string
+// Describe returns a short "model via host" summary for startup logs (no key).
+func (t *Tutor) Describe() string {
+	return fmt.Sprintf("%s via %s", t.model, t.baseURL)
 }
 
 // Ask sends the learner's question (plus their current query for context) and
@@ -90,45 +120,41 @@ func (t *Tutor) Ask(ctx context.Context, question, currentSQL string, history []
 		return "", fmt.Errorf("tutor is not configured (no API key)")
 	}
 
-	userText := buildUserMessage(question, currentSQL)
-	contents := buildContents(history, userText)
-	reqBody := geminiRequest{
-		SystemInstruction: &content{Parts: []part{{Text: systemPrompt}}},
-		Contents:          contents,
-		GenerationConfig: &generationConfig{
-			Temperature:     0.4,
-			MaxOutputTokens: 800,
-		},
+	reqBody := chatRequest{
+		Model:       t.model,
+		Messages:    buildMessages(history, buildUserMessage(question, currentSQL)),
+		Temperature: 0.4,
+		MaxTokens:   800,
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", err
 	}
 
-	url := apiBase + t.model + ":generateContent"
+	url := t.baseURL + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-goog-api-key", t.apiKey)
+	req.Header.Set("Authorization", "Bearer "+t.apiKey)
 
 	resp, err := t.http.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("calling Gemini: %w", err)
+		return "", fmt.Errorf("calling the AI provider: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var out geminiResponse
+	var out chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return "", fmt.Errorf("decoding Gemini response: %w", err)
+		return "", fmt.Errorf("decoding the AI response (is AI_BASE_URL correct?): %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		msg := out.Error.Message
 		if msg == "" {
 			msg = resp.Status
 		}
-		return "", fmt.Errorf("Gemini API error: %s", msg)
+		return "", fmt.Errorf("AI API error (%d): %s", resp.StatusCode, msg)
 	}
 
 	text := out.text()
@@ -138,28 +164,23 @@ func (t *Tutor) Ask(ctx context.Context, question, currentSQL string, history []
 	return text, nil
 }
 
-// buildContents turns the recent history plus the new question into Gemini's
-// contents array. It keeps only the last historyWindow messages and ensures the
-// sequence starts with a user turn (Gemini expects user-first, alternating).
-func buildContents(history []Message, userText string) []content {
+// buildMessages assembles the system prompt, the rolling history window, and the
+// new question into the OpenAI-style messages array.
+func buildMessages(history []Message, userText string) []chatMessage {
 	if len(history) > historyWindow {
 		history = history[len(history)-historyWindow:]
 	}
-	// Drop any leading tutor/model turns left over from the trim window.
-	for len(history) > 0 && history[0].Role == "tutor" {
-		history = history[1:]
-	}
-
-	contents := make([]content, 0, len(history)+1)
+	msgs := make([]chatMessage, 0, len(history)+2)
+	msgs = append(msgs, chatMessage{Role: "system", Content: systemPrompt})
 	for _, m := range history {
 		role := "user"
 		if m.Role == "tutor" {
-			role = "model"
+			role = "assistant"
 		}
-		contents = append(contents, content{Role: role, Parts: []part{{Text: m.Text}}})
+		msgs = append(msgs, chatMessage{Role: role, Content: m.Text})
 	}
-	contents = append(contents, content{Role: "user", Parts: []part{{Text: userText}}})
-	return contents
+	msgs = append(msgs, chatMessage{Role: "user", Content: userText})
+	return msgs
 }
 
 // buildUserMessage combines the learner's question with their current query so
@@ -180,45 +201,33 @@ func buildUserMessage(question, currentSQL string) string {
 	return b.String()
 }
 
-// --- Gemini JSON wire types --------------------------------------------------
+// --- OpenAI-compatible chat wire types ---------------------------------------
 
-type geminiRequest struct {
-	SystemInstruction *content          `json:"systemInstruction,omitempty"`
-	Contents          []content         `json:"contents"`
-	GenerationConfig  *generationConfig `json:"generationConfig,omitempty"`
+type chatRequest struct {
+	Model       string        `json:"model"`
+	Messages    []chatMessage `json:"messages"`
+	Temperature float64       `json:"temperature"`
+	MaxTokens   int           `json:"max_tokens"`
 }
 
-type content struct {
-	Role  string `json:"role,omitempty"`
-	Parts []part `json:"parts"`
+type chatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
-type part struct {
-	Text string `json:"text"`
-}
-
-type generationConfig struct {
-	Temperature     float64 `json:"temperature"`
-	MaxOutputTokens int     `json:"maxOutputTokens"`
-}
-
-type geminiResponse struct {
-	Candidates []struct {
-		Content content `json:"content"`
-	} `json:"candidates"`
+type chatResponse struct {
+	Choices []struct {
+		Message chatMessage `json:"message"`
+	} `json:"choices"`
 	Error struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
 
-// text pulls the concatenated text out of the first candidate.
-func (r geminiResponse) text() string {
-	if len(r.Candidates) == 0 {
+// text pulls the assistant's reply out of the first choice.
+func (r chatResponse) text() string {
+	if len(r.Choices) == 0 {
 		return ""
 	}
-	var b strings.Builder
-	for _, p := range r.Candidates[0].Content.Parts {
-		b.WriteString(p.Text)
-	}
-	return strings.TrimSpace(b.String())
+	return strings.TrimSpace(r.Choices[0].Message.Content)
 }
