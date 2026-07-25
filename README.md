@@ -2,6 +2,18 @@
 
 A little SQL game. You write SQL against a full Pokemon database and learn SQL along the way.
 
+## Credits
+
+Built on the shoulders of these projects:
+
+- [veekun/pokedex](https://github.com/veekun/pokedex) — the Pokemon SQLite database and example queries. Thanks to Veekun for creating it.
+- [CodeMirror](https://codemirror.net) — the in-browser SQL editor (MIT).
+- [sql.js](https://github.com/sql-js/sql.js) — SQLite compiled to WebAssembly, runs the queries in your browser (MIT).
+
+Full license texts are in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+Pokemon and Pokemon character names are trademarks of Nintendo, Game Freak, and The Pokemon Company. This is an unofficial, non-commercial educational tool, not affiliated with or endorsed by them.
+
 ## What it is
 
 SQL-Dex hands you a 170-table Pokemon database (the veekun pokedex) and lets you query it. It comes in two flavors:
