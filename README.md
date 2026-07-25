@@ -6,7 +6,9 @@ A little SQL game. You write SQL against a full Pokemon database and learn SQL a
 
 Built on the shoulders of these projects:
 
-- [veekun/pokedex](https://github.com/veekun/pokedex) — the Pokemon SQLite database and example queries. Thanks to Veekun for creating it.
+- [teamdandelion/PokemonSQLTutorial](https://github.com/teamdandelion/PokemonSQLTutorial) — the Pokemon SQLite database and starter example queries this project is built around.
+- [veekun/pokedex](https://github.com/veekun/pokedex) — the underlying Pokemon data and tooling that database was generated from. Thanks to Veekun for creating it.
+- [PokeAPI/sprites](https://github.com/PokeAPI/sprites) — the Pokemon sprite images shown next to query results.
 - [CodeMirror](https://codemirror.net) — the in-browser SQL editor (MIT).
 - [sql.js](https://github.com/sql-js/sql.js) — SQLite compiled to WebAssembly, runs the queries in your browser (MIT).
 
